@@ -10,7 +10,7 @@ class SwiftMailer extends CComponent
 	/**
 	 * smtp, sendmail or mail
 	 */
-	public $mailer = 'sendmail'; //
+	public $mailer = 'sendmail'; // 
 	/**
 	 * SMTP outgoing mail server host
 	 */
@@ -20,21 +20,25 @@ class SwiftMailer extends CComponent
 	 */
 	public $port = 25;
 	/**
-	 * SMTP Relay account username
+	 * SMTP Password
 	 */
 	public $username;
 	/**
-	 * SMTP Relay account password
+	 * SMTP email
 	 */
 	public $password;
 	/**
-	 * SMTP security (ssl or tls)
+	 * SMTP security
 	 */
 	public $security;
 	/**
-	 * @param mixed Email address messages are going to be sent "from"
+	 * @param string Message Subject
 	 */
-	public $from;
+	public $Subject;
+	/**
+	 * @param mixed Email addres messages are going to be sent "from"
+	 */
+	public $From;
 	/**
 	 * @param string HTML Message Body
 	 */
@@ -43,72 +47,35 @@ class SwiftMailer extends CComponent
 	 * @param string Alternative message body (plain text)
 	 */
 	public $altBody = null;
-	/**
-	 * sendmailCommand
-	 */
-	public $sendmailCommand = '/usr/bin/sendmail -t';
-	public $logMailerActivity = false;
 
-	/**
-	 * logMailerDebug
-	 *
-	 * @description  outputs additional debug info from mailer
-	 * 		only available when logMailerActivity == true
-	 */
-	public $logMailerDebug = false;
-
-	protected $_subject = null;
 	protected $_addresses = array();
-	protected $_attachments = array();
+	// protected $_attachments = array();
+	protected $_attachments;
+
+	public $logMailerActivity = false;
 
 	public function init()
 	{
-		if (!class_exists('Swift', false))
-        {
-        	$this->registerAutoloader();
-        	// include the SwiftMailer Dependencies
-        	require_once dirname(__FILE__). '/lib/dependency_maps/cache_deps.php';
-        	require_once dirname(__FILE__) . '/lib/dependency_maps/mime_deps.php';
-        	require_once dirname(__FILE__) . '/lib/dependency_maps/message_deps.php';
-        	require_once dirname(__FILE__) . '/lib/dependency_maps/transport_deps.php';
-        	//Load in global library preferences
-			require_once dirname(__FILE__) . '/lib/preferences.php';
-		}
+		spl_autoload_unregister(array('YiiBase', 'autoload'));
+		require_once(dirname(__FILE__) . '/lib/swift_required.php');
+		spl_autoload_register(array('YiiBase', 'autoload'));
 	}
 
-	protected function registerAutoloader()
-	{
-		require_once(dirname(__FILE__).'/lib/classes/Swift.php');
-		Swift::registerAutoLoad();
-        // Register SwiftMailer's autoloader before Yii for correct class loading.
-        $autoLoad = array('Swift', 'autoload');
-        spl_autoload_unregister($autoLoad);
-        Yii::registerAutoloader($autoLoad);
-    }
-
-	public function addAddress($address)
+	public function AddAddress($address)
 	{
 		if (!in_array($address, $this->_addresses))
 			$this->_addresses[] = $address;
 		return $this;
 	}
-	public function subject($subject)
+
+	public function AddFile($address)
 	{
-		$this->_subject = $subject;
-		return $this;
-	}
-	public function setSubject($subject)
-	{
-		$this->_subject = $subject;
-	}
-	public function addFile($address)
-	{
-		if (!in_array($address, $this->_attachments))
-			$this->_attachments[] = $address;
+		// if (!in_array($address, $this->_attachments))
+			$this->_attachments = $address;
 		return $this;
 	}
 
-	public function msgHTML($body)
+	public function MsgHTML($body)
 	{
 		$this->body = $body;
 		if ($this->altBody == null) {
@@ -120,41 +87,26 @@ class SwiftMailer extends CComponent
 	/**
 	 * Helper function to send emails like this:
 	 * <code>
-	 *        Yii::app()->mailer->addAddress($email);
-	 *        Yii::app()->mailer->subject($newslettersOne['name']);
-	 *        Yii::app()->mailer->msgHTML($template['content']);
-	 *        Yii::app()->mailer->send();
-	 * </code>
-	 * or
-	 * <code>
-	 *        Yii::app()->mailer->addAddress($email)
-	 *        	->subject($newslettersOne['name'])
-	 *        	->msgHTML($template['content'])
-	 *        	->send();
+	 *        Yii::app()->mailer->AddAddress($email);
+	 *        Yii::app()->mailer->Subject = $newslettersOne['name'];
+	 *         Yii::app()->mailer->MsgHTML($template['content']);
+	 *        Yii::app()->mailer->Send();
 	 * </code>
 	 * @return boolean Whether email has been sent or not
 	 */
-	public function send()
+	public function Send()
 	{
-	 	$logger = null;
 		//Create the Transport
 		$transport = $this->loadTransport();
 
 		//Create the Mailer using your created Transport
 		$mailer = Swift_Mailer::newInstance($transport);
 
-		if ($this->logMailerActivity && $this->logMailerDebug) {
-
-			$logger = new Swift_Plugins_Loggers_ArrayLogger();
-			// pass false to give plain text output for console in EchoLogger
-			//$logger = new Swift_Plugins_Loggers_EchoLogger(false);
-			$mailer->registerPlugin(new Swift_Plugins_LoggerPlugin($logger));
-		}
-
 		//Create a message
-		$message = Swift_Message::newInstance($this->_subject)
-			->setFrom($this->from)
+		$message = Swift_Message::newInstance($this->Subject)
+			->setFrom($this->From)
 			->setTo($this->_addresses);
+
 
 		if ($this->body) {
 			$message->addPart($this->body, 'text/html');
@@ -164,47 +116,38 @@ class SwiftMailer extends CComponent
 		}
 
 		if ($this->_attachments) {
-			foreach($this->_attachments as $path)
-				$message->attach(Swift_Attachment::fromPath($path));
+			// foreach ($this->_attachments as $path)
+			// 	$message->attach(Swift_Attachment::fromPath($path));
+			$attachment = Swift_Attachment::newInstance($this->_attachments, 'receipt.pdf', 'application/pdf');
+			$message->attach($attachment);				
 		}
 
 		$result = $mailer->send($message);
-		if ($this->logMailerActivity === true) {
+
+		if ($this->logMailerActivity == true) {
 			if (!$result) {
-				$logMessage = 'Failed to send "' . $this->_subject . '" email to [' . implode(', ', $this->addressesFlat()) . ']'
+				$logMessage = 'Failed to send "' . $this->Subject . '" email to [' . implode(', ', $this->addressesFlat()) . ']'
 					. "\nMessage:\n"
 					. ($this->altBody ? $this->altBody : $this->body);
 				Yii::log($logMessage, 'error', 'appMailer');
-				if ($this->logMailerDebug)
-				{
-					$output = $logger->dump();
-					Yii::log($output, 'error', 'appMailer');
-				}
-				goto COMPLETE;
+			} else {
+				$logMessage = 'Sent email "' . $this->Subject . '" to [' . implode(', ', $this->addressesFlat()) . ']'
+					. "\nMessage:\n"
+					. ($this->altBody ? $this->altBody : $this->body);
+				Yii::log($logMessage, 'trace', 'appMailer');
 			}
-
-			$logMessage = 'Sent email "' . $this->_subject . '" to [' . implode(', ', $this->addressesFlat()) . ']'
-				. "\nMessage:\n"
-				. ($this->altBody ? $this->altBody : $this->body);
-			Yii::log($logMessage, 'info','appMailer');
-			if ($this->logMailerDebug)
-			{
-				$output = $logger->dump();
-				Yii::log($output, 'info', 'appMailer');
-			}
-
 		}
 
-	COMPLETE:
-		$this->clearAddresses();
+		$this->ClearAddresses();
 
 		return $result;
 	}
 
-	public function clearAddresses()
+	public function ClearAddresses()
 	{
 		$this->_addresses = array();
 	}
+
 
 	public function addressesFlat()
 	{
@@ -247,6 +190,8 @@ class SwiftMailer extends CComponent
 		return Swift_Image;
 	}
 
+	public $sendmailCommand = '/usr/bin/sendmail -t';
+
 	public function smtpTransport($host = null, $port = null, $security = null)
 	{
 		return Swift_SmtpTransport::newInstance($host, $port, $security);
@@ -279,4 +224,6 @@ class SwiftMailer extends CComponent
 
 		return $transport;
 	}
+
+
 }

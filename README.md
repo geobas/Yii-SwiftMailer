@@ -1,5 +1,7 @@
 This is basically updated wrapper of SwiftMailer which can be used as application component.
 
+> A modification was made in order to attach a dynamically created document not a physical document.
+
 ##Installation
 
 1. Unzip extension contents to protected/extensions/ folder
