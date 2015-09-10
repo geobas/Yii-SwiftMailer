@@ -1,6 +1,6 @@
 This is basically updated wrapper of SwiftMailer which can be used as application component.
 
-> A modification was made in order to attach a dynamically created document not a physical document.
+> A modification was made in order to attach a dynamically created document instead of a physical document.
 
 ##Installation
 
